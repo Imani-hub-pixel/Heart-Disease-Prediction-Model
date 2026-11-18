@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10-year heart disease risk check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #eef2f1; --panel: #ffffff; --ink: #1b2a2f; --muted: #5a6d73;
+    --line: #d5dedd; --accent: #1f6f78; --accent-dark: #17555c;
+    --high: #b23a48; --low: #2e7d5b; --focus: #f2b134;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.55;
+  }
+  .page { max-width: 760px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+  h1 {
+    font-family: "Newsreader", Georgia, serif; font-weight: 600;
+    font-size: clamp(1.9rem, 5vw, 2.6rem); line-height: 1.15; margin: 0 0 .6rem;
+  }
+  .intro { color: var(--muted); max-width: 60ch; margin: 0 0 1.75rem; }
+
+  /* Result */
+  .result {
+    background: var(--panel); border: 1px solid var(--line);
+    border-left: 6px solid var(--tone); border-radius: 6px;
+    padding: 1.25rem 1.4rem; margin-bottom: 1.5rem;
+  }
+  .result.high { --tone: var(--high); }
+  .result.low  { --tone: var(--low); }
+  .result h2 {
+    font-family: "Newsreader", Georgia, serif; font-size: 1.5rem;
+    margin: 0 0 .75rem; color: var(--tone);
+  }
+  .gauge { position: relative; height: 12px; border-radius: 6px;
+    background: linear-gradient(90deg, var(--low), #e0b43c 50%, var(--high)); }
+  .gauge .pin {
+    position: absolute; top: -5px; width: 4px; height: 22px; border-radius: 2px;
+    background: var(--ink); transform: translateX(-2px);
+    box-shadow: 0 0 0 2px #fff;
+  }
+  .gauge-scale { display: flex; justify-content: space-between;
+    font-size: .8rem; color: var(--muted); margin-top: .35rem; }
+  .score { margin: .9rem 0 .2rem; font-weight: 600; }
+  .note { font-size: .88rem; color: var(--muted); margin: 0; }
+
+  .error {
+    background: #fbeaec; border: 1px solid #e6b3ba; color: #7d2430;
+    padding: .8rem 1rem; border-radius: 6px; margin-bottom: 1.25rem;
+  }
+
+  /* Form */
+  form { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: .5rem 1.4rem 1.5rem; }
+  fieldset { border: 0; border-bottom: 1px solid var(--line); margin: 0; padding: 1.4rem 0 1.2rem; }
+  fieldset:last-of-type { border-bottom: 0; }
+  legend {
+    font-family: "Newsreader", Georgia, serif; font-weight: 600; font-size: 1.25rem;
+    padding: 0; float: left; width: 100%; margin-bottom: .2rem;
+  }
+  .section-desc { clear: both; color: var(--muted); font-size: .92rem; margin: 0 0 1rem; max-width: 60ch; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem 1.4rem; }
+  @media (max-width: 600px) { .grid { grid-template-columns: 1fr; } }
+
+  label { display: block; font-weight: 600; font-size: .95rem; margin-bottom: .3rem; }
+  .req { color: var(--high); }
+  .control { position: relative; }
+  input, select {
+    width: 100%; padding: .6rem .75rem; font: inherit; color: var(--ink);
+    background: #fbfdfc; border: 1px solid #b9c6c5; border-radius: 6px;
+  }
+  input[readonly] { background: #eef2f1; color: var(--muted); }
+  .control input { padding-right: 4.2rem; }
+  .unit {
+    position: absolute; right: .75rem; top: 50%; transform: translateY(-50%);
+    font-size: .8rem; color: var(--muted); pointer-events: none;
+  }
+  .hint { font-size: .84rem; color: var(--muted); margin: .35rem 0 0; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; }
+
+  .actions { display: flex; gap: .8rem; align-items: center; margin-top: 1.2rem; flex-wrap: wrap; }
+  button {
+    font: inherit; font-weight: 600; cursor: pointer; border-radius: 6px; padding: .75rem 1.5rem;
+  }
+  .primary { background: var(--accent); color: #fff; border: 1px solid var(--accent); }
+  .primary:hover { background: var(--accent-dark); }
+  .secondary { background: transparent; color: var(--accent-dark); border: 1px solid #9fb8ba; }
+  .secondary:hover { background: #eef5f5; }
+  .req-note { font-size: .85rem; color: var(--muted); margin-left: auto; }
+
+  .disclaimer { font-size: .85rem; color: var(--muted); margin-top: 1.5rem; max-width: 65ch; }
+</style>
+</head>
+<body>
+<main class="page">
+
+  {% macro num(name, text, hint, unit='') %}
+  <div>
+    <label for="{{ name }}">{{ text }}{% if name in required %}<span class="req"> *</span>{% endif %}</label>
+    <div class="control">
+      <input id="{{ name }}" type="number" step="any" inputmode="decimal" name="{{ name }}"
+             value="{{ form.get(name, '') if form else '' }}" {% if name in required %}required{% endif %}>
+      {% if unit %}<span class="unit">{{ unit }}</span>{% endif %}
+    </div>
+    <p class="hint">{{ hint }}</p>
+  </div>
+  {% endmacro %}
+
+  {% macro sel(name, text, hint, options) %}
+  <div>
+    <label for="{{ name }}">{{ text }}{% if name in required %}<span class="req"> *</span>{% endif %}</label>
+    <select id="{{ name }}" name="{{ name }}" {% if name in required %}required{% endif %}>
+      <option value="">Choose one</option>
+      {% for val, t in options %}
+        <option value="{{ val }}" {% if form and form.get(name) == val %}selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+    <p class="hint">{{ hint }}</p>
+  </div>
+  {% endmacro %}
+
+  <h1>Check your 10-year heart disease risk</h1>
+  <p class="intro">
+    Answer the questions below and the model will estimate how likely it is that someone with
+    this profile develops coronary heart disease (CHD) within ten years. Fields marked * are
+    required. If you don't know another value, leave it blank.
+  </p>
+
+  {% if error %}
+    <div class="error" role="alert">{{ error }}</div>
+  {% endif %}
+
+  {% if label is defined %}
+    <section class="result {{ 'high' if label == 1 else 'low' }}" id="result" aria-live="polite">
+      <h2>{{ "Higher estimated risk" if label == 1 else "Lower estimated risk" }}</h2>
+      <div class="gauge" role="img" aria-label="Risk score {{ prob }} percent">
+        <div class="pin" style="left: {{ [[prob, 0]|max, 100]|min }}%"></div>
+      </div>
+      <div class="gauge-scale"><span>Lower</span><span>Higher</span></div>
+      <p class="score">Model score: {{ prob }}%</p>
+      <p class="note">
+        This score is a risk indicator from a statistical model, not an exact probability or a diagnosis.
+        {% if label == 1 %}Consider sharing these results with a doctor.{% endif %}
+      </p>
+    </section>
+  {% endif %}
+
+  <form method="POST" action="/predict">
+
+    <fieldset>
+      <legend>About you</legend>
+      <p class="section-desc">Basic details. Age and sex are two of the strongest predictors of heart disease.</p>
+      <div class="grid">
+        {{ sel('gender', 'Sex', 'Biological sex as recorded in the study data.', [('0','Female'),('1','Male')]) }}
+        {{ num('age', 'Age', 'Age in years. Risk rises steadily with age.', 'years') }}
+        {{ sel('education', 'Education level',
+               'Highest level completed. It is used as a rough stand-in for socioeconomic background.',
+               [('1','Some high school'),('2','High school or GED'),('3','Some college or vocational school'),('4','College degree')]) }}
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Smoking</legend>
+      <p class="section-desc">Smoking damages blood vessels and is one of the biggest controllable risk factors.</p>
+      <div class="grid">
+        {{ sel('currentSmoker', 'Do you currently smoke?', 'Choose "No" if you have quit.', [('0','No'),('1','Yes')]) }}
+        {{ num('cigsPerDay', 'Cigarettes per day', 'Average number per day. Set to 0 for non-smokers.', 'per day') }}
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Medical history</legend>
+      <p class="section-desc">Conditions that a doctor has told you about.</p>
+      <div class="grid">
+        {{ sel('BPMeds', 'Taking blood pressure medication?', 'Whether you currently take medicine to lower blood pressure.', [('0','No'),('1','Yes')]) }}
+        {{ sel('prevalentHyp', 'Hypertension (high blood pressure)', 'Diagnosed with persistently high blood pressure.', [('0','No'),('1','Yes')]) }}
+        {{ sel('prevalentStroke', 'Previous stroke', 'Whether you have ever had a stroke.', [('0','No'),('1','Yes')]) }}
+        {{ sel('diabetes', 'Diabetes', 'Diagnosed with diabetes, which strains the heart and blood vessels.', [('0','No'),('1','Yes')]) }}
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Measurements</legend>
+      <p class="section-desc">Numbers from a recent check-up or lab test. Typical healthy ranges are shown for reference.</p>
+      <div class="grid">
+        {{ num('sysBP', 'Systolic blood pressure', 'The top number when blood pressure is measured, taken while the heart beats. Healthy: below 120.', 'mmHg') }}
+        {{ num('diaBP', 'Diastolic blood pressure', 'The bottom number, taken while the heart rests between beats. Healthy: below 80.', 'mmHg') }}
+        {{ num('totChol', 'Total cholesterol', 'Fatty substance in the blood that can build up in arteries. Desirable: below 200.', 'mg/dL') }}
+        {{ num('glucose', 'Blood glucose', 'Blood sugar level. Fasting healthy range: 70 to 99.', 'mg/dL') }}
+        {{ num('BMI', 'Body mass index (BMI)', 'Weight relative to height (kg divided by height in metres squared). Healthy: 18.5 to 24.9.', 'kg/m²') }}
+        {{ num('heartRate', 'Resting heart rate', 'Beats per minute while at rest. Typical adult range: 60 to 100.', 'bpm') }}
+      </div>
+    </fieldset>
+
+    <div class="actions">
+      <button type="submit" class="primary">Estimate my risk</button>
+      <button type="reset" class="secondary" onclick="window.location='/'; return false;">Clear form</button>
+      <span class="req-note">* required</span>
+    </div>
+  </form>
+
+  <p class="disclaimer">
+    This tool is for learning and is based on the Framingham Heart Study dataset. It cannot
+    diagnose or rule out heart disease. For health decisions, talk to a qualified doctor.
+  </p>
+</main>
+
+<script>
+  // Non-smokers smoke 0 cigarettes: fill it in and lock the field.
+  const smoker = document.getElementById("currentSmoker");
+  const cigs = document.getElementById("cigsPerDay");
+  function syncCigs() {
+    if (smoker.value === "0") { cigs.value = 0; cigs.readOnly = true; }
+    else { cigs.readOnly = false; }
+  }
+  smoker.addEventListener("change", syncCigs);
+  syncCigs();
+
+  // Bring the result into view after submitting.
+  const result = document.getElementById("result");
+  if (result) result.scrollIntoView({ behavior: "smooth", block: "start" });
+</script>
+</body>
+</html>
